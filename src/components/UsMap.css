@@ -1,0 +1,259 @@
+.usmap-container {
+  position: relative;
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.usmap-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Fill color encodes data about the region's code, not hover state:
+   gray = no data yet, washed-out green = still on its original code. */
+.usmap-state {
+  fill: #d9dde2;
+  stroke: #ffffff;
+  stroke-width: 1;
+  stroke-linejoin: round;
+  transition: filter 0.12s ease;
+  cursor: zoom-in;
+}
+
+.usmap-state.original {
+  fill: #cde0c6;
+}
+
+.usmap-state.later {
+  fill: #c0d3e9;
+}
+
+/* Per-code shade variants are inline styles (CODE_FILLS in UsMap.tsx);
+   the classes above are the fallback base colors. */
+
+/* Test mode: gray by default, colored only by the check. */
+.usmap-state.test-right,
+.usmap-dc-dot.test-right {
+  fill: #93c98b;
+}
+
+.usmap-state.test-wrong,
+.usmap-dc-dot.test-wrong {
+  fill: #e29393;
+}
+
+.usmap-state.test-partial,
+.usmap-dc-dot.test-partial {
+  fill: #8fb3dd;
+}
+
+/* Hover: faint modulation of the fill + a crisp outline drawn separately. */
+.usmap-state.hovered {
+  filter: brightness(0.95) saturate(1.25);
+}
+
+.usmap-state.zoomed-here {
+  cursor: zoom-out;
+}
+
+/* County-union region shapes: no per-county stroke (each county is its own
+   subpath); the cosmetic county-lines layer draws the borders instead. */
+.usmap-state.county-shape {
+  stroke: none;
+}
+
+/* All county borders, one non-interactive path above the region fills. */
+.usmap-countylines {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 0.45;
+  stroke-linejoin: round;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.usmap-hover-outline {
+  fill: none;
+  stroke: #44607e;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.usmap-dc-dot {
+  fill: #d9dde2;
+  stroke: #7b8598;
+  stroke-width: 1;
+  cursor: zoom-in;
+  transition: filter 0.12s ease, opacity 0.25s ease;
+}
+
+.usmap-dc-dot.original {
+  fill: #cde0c6;
+}
+
+.usmap-dc-dot.hovered {
+  filter: brightness(0.95) saturate(1.25);
+}
+
+.usmap-dc-dot.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.usmap-outline {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 1;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+/* Work-in-progress marker: state's area-code history not encoded yet. */
+.usmap-todo-outline {
+  fill: none;
+  stroke: #d64545;
+  stroke-width: 1;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.usmap-code-label {
+  fill: #3d4759;
+  font-weight: 600;
+  text-anchor: middle;
+  dominant-baseline: central;
+  pointer-events: none;
+  user-select: none;
+}
+
+.usmap-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: #1c2333;
+  color: #f0f3f8;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  line-height: 1.3;
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+}
+
+.usmap-tooltip-sub {
+  font-size: 11px;
+  color: #9aa5b8;
+}
+
+.usmap-tooltip-desc {
+  font-size: 11.5px;
+  color: #c6cfdd;
+  white-space: normal;
+  max-width: 260px;
+  margin-top: 4px;
+  line-height: 1.45;
+}
+
+.usmap-coord-badge {
+  position: absolute;
+  pointer-events: none;
+  background: #1c2333;
+  color: #d9e2f0;
+  padding: 5px 9px;
+  border-radius: 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  display: flex;
+  flex-direction: column;
+  z-index: 10;
+}
+
+.usmap-coord-county {
+  font-size: 11px;
+  color: #c6cfdd;
+}
+
+.usmap-coord-sub {
+  font-size: 10px;
+  color: #8a94a6;
+}
+
+.usmap-testpanel {
+  position: absolute;
+  left: -104px; /* fully outside the map so it never covers California */
+  top: 35%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 96px;
+  z-index: 15;
+}
+
+/* Narrow windows have no side margin to borrow — tuck it into the empty
+   ocean corner above Washington instead. */
+@media (max-width: 1320px) {
+  .usmap-testpanel {
+    left: 8px;
+    top: 8px;
+  }
+}
+
+.usmap-testbtn {
+  padding: 7px 0;
+  border-radius: 8px;
+  border: 1px solid #cdd5df;
+  background: #ffffff;
+  color: #1c2333;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(28, 35, 51, 0.08);
+}
+
+.usmap-testbtn:hover {
+  background: #f2f5f9;
+}
+
+.usmap-testbtn.active {
+  background: #44607e;
+  border-color: #44607e;
+  color: #ffffff;
+}
+
+.usmap-testbtn.check {
+  background: #cde0c6;
+  border-color: #a9c69f;
+}
+
+.usmap-testbtn.check:hover {
+  background: #bfd6b6;
+}
+
+.usmap-testhint {
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: #8a94a6;
+  text-align: center;
+}
+
+.usmap-test-input {
+  position: absolute;
+  width: 78px;
+  padding: 4px 6px;
+  border: 2px solid #44607e;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  text-align: center;
+  background: #ffffff;
+  color: #1c2333;
+  z-index: 20;
+  outline: none;
+}

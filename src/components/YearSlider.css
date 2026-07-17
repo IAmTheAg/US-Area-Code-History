@@ -1,0 +1,43 @@
+.yearslider {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e7ee;
+  border-radius: 12px;
+  padding: 12px 18px;
+  box-shadow: 0 4px 18px rgba(28, 35, 51, 0.12);
+  z-index: 20;
+  width: min(560px, calc(100vw - 48px));
+}
+
+.yearslider input[type='range'] {
+  flex: 1;
+  accent-color: #44607e;
+}
+
+.yearslider.disabled {
+  opacity: 0.55;
+}
+
+.yearslider.disabled input[type='range'] {
+  cursor: not-allowed;
+}
+
+.yearslider-bound {
+  font-size: 11px;
+  color: #8a94a6;
+}
+
+.yearslider-year {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 18px;
+  color: #1c2333;
+  min-width: 52px;
+  text-align: center;
+}
