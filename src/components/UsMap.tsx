@@ -241,6 +241,7 @@ export default function UsMap({ year, testMode = false, onTestModeChange }: UsMa
   const [results, setResults] = useState<Record<string, 'right' | 'wrong' | 'partial'>>({});
   const [editing, setEditing] = useState<{ key: string; sx: number; sy: number } | null>(null);
   const [draft, setDraft] = useState('');
+  const [showAnswers, setShowAnswers] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const pathRefs = useRef(new Map<string, SVGPathElement>());
@@ -334,6 +335,7 @@ export default function UsMap({ year, testMode = false, onTestModeChange }: UsMa
     setResults({});
     setEditing(null);
     setDraft('');
+    setShowAnswers(false);
   }, [testMode]);
 
   useLayoutEffect(() => {
@@ -493,12 +495,10 @@ export default function UsMap({ year, testMode = false, onTestModeChange }: UsMa
     setEditing({ key, sx: e.clientX - rect.left, sy: e.clientY - rect.top });
   };
 
-  const commitDraft = () => {
-    if (!editing) return;
-    const key = editing.key;
+  const commitGuess = (key: string, value: string) => {
     setGuesses((g) => {
       const next = { ...g };
-      if (draft) next[key] = draft;
+      if (value) next[key] = value;
       else delete next[key];
       return next;
     });
@@ -509,8 +509,108 @@ export default function UsMap({ year, testMode = false, onTestModeChange }: UsMa
       delete next[key];
       return next;
     });
+  };
+
+  const commitDraft = () => {
+    if (!editing) return;
+    commitGuess(editing.key, draft);
     setEditing(null);
     setDraft('');
+  };
+
+  // Tab targets: every answerable region at the selected year with a map
+  // anchor (its label spot), ordered in a west-east serpentine by rows so
+  // Tab usually moves somewhere nearby. Label-less duplicate shapes (the
+  // paint-over blobs sharing a code's key) collapse into one target.
+  const tabTargets = useMemo(() => {
+    const targets: { key: string; mx: number; my: number }[] = [];
+    const seen = new Set<string>();
+    for (const [stateId, active] of activeByState) {
+      for (const region of active) {
+        let key: string, mx: number, my: number;
+        if (region.counties) {
+          const spot = countyLabelSpot(stateId, region);
+          key = `${stateId}:${region.code}`;
+          mx = region.labelX ?? spot.x;
+          my = region.labelY ?? spot.y;
+        } else if (region.d) {
+          if (region.labelX === undefined || region.labelY === undefined) continue;
+          key = `${stateId}:${region.code}`;
+          mx = region.labelX;
+          my = region.labelY;
+        } else {
+          if (active.length !== 1) continue;
+          key = stateId;
+          if (stateId === 'DC') {
+            mx = DC_DOT.x;
+            my = DC_DOT.y;
+          } else {
+            const spot = labelSpots[stateId];
+            const box = spot ? undefined : pathRefs.current.get(stateId)?.getBBox();
+            if (spot) {
+              mx = spot.x;
+              my = spot.y;
+            } else if (box) {
+              mx = box.x + box.width / 2;
+              my = box.y + box.height / 2;
+            } else continue;
+          }
+        }
+        if (seen.has(key)) continue;
+        seen.add(key);
+        targets.push({ key, mx, my });
+      }
+    }
+    const row = (y: number) => Math.round(y / 60);
+    targets.sort(
+      (a, b) =>
+        row(a.my) - row(b.my) ||
+        (row(a.my) % 2 ? b.mx - a.mx : a.mx - b.mx) ||
+        a.my - b.my,
+    );
+    return targets;
+  }, [activeByState, labelSpots]);
+
+  // Tab/shift-Tab from the answer input: store the draft and hop to the
+  // next region. When zoomed, stay among the regions currently in view.
+  const advanceEditing = (dir: 1 | -1) => {
+    if (!editing) return;
+    const svg = svgRef.current;
+    const rect = containerRef.current?.getBoundingClientRect();
+    const matrix = svg?.getScreenCTM();
+    if (!svg || !rect || !matrix) {
+      commitDraft();
+      return;
+    }
+    const v = viewRef.current;
+    const inView = tabTargets.filter(
+      (t) => t.mx >= v.x && t.mx <= v.x + v.w && t.my >= v.y && t.my <= v.y + v.h,
+    );
+    commitGuess(editing.key, draft);
+    // Only ever hop to a region that hasn't been answered yet (the one
+    // just committed doesn't count as open even when left blank). Prefer
+    // the current view; fall back to anywhere; if the map is fully
+    // answered, just close the input.
+    const open = (t: { key: string }) => t.key !== editing.key && !guesses[t.key];
+    const pick = (pool: { key: string; mx: number; my: number }[]) => {
+      const idx = pool.findIndex((t) => t.key === editing.key);
+      for (let k = 1; k <= pool.length; k++) {
+        const cand = pool[(idx + dir * k + pool.length * k) % pool.length];
+        if (open(cand)) return cand;
+      }
+      return undefined;
+    };
+    const inViewOpen = inView.some(open);
+    const next = pick(inViewOpen ? inView : tabTargets);
+    if (!next) {
+      setEditing(null);
+      setDraft('');
+      return;
+    }
+    const p = new DOMPoint(next.mx, next.my).matrixTransform(matrix);
+    setDraft('');
+    setEditing({ key: next.key, sx: p.x - rect.left, sy: p.y - rect.top });
+    setHovered(next.key);
   };
 
   const regionForKey = useCallback(
@@ -776,11 +876,16 @@ export default function UsMap({ year, testMode = false, onTestModeChange }: UsMa
               key = state.id;
             }
             let text: string;
-            if (testMode) {
-              // Never show the answers; show what the user typed.
+            if (testMode && !showAnswers) {
+              // Hide the answers; show what the user typed.
               const guess = guesses[key];
               if (!guess) return null;
               text = guess;
+            } else if (testMode) {
+              // "Show answers": reveal the real codes; fills stay as-is.
+              const overlays = activeOverlays(region);
+              text = [region.code, ...overlays.map((o) => o.code)].join('/');
+              if (overlays.length) fontSize *= 0.72;
             } else {
               const overlays = activeOverlays(region);
               text = [region.code, ...overlays.map((o) => o.code)].join('/');
@@ -816,10 +921,19 @@ export default function UsMap({ year, testMode = false, onTestModeChange }: UsMa
             <button type="button" className="usmap-testbtn check" onClick={runCheck}>
               Check
             </button>
+            <button
+              type="button"
+              className={`usmap-testbtn${showAnswers ? ' active' : ''}`}
+              onClick={() => setShowAnswers((s) => !s)}
+            >
+              {showAnswers ? 'Hide answers' : 'Show answers'}
+            </button>
             <span className="usmap-testhint">
               click a region, type its code(s)
               <br />
               e.g. 203 or 203/475
+              <br />
+              tab saves &amp; hops to the next
               <br />
               (shift-click zooms)
             </span>
@@ -840,6 +954,10 @@ export default function UsMap({ year, testMode = false, onTestModeChange }: UsMa
           }}
           onKeyDown={(e) => {
             if (e.key === 'Enter') commitDraft();
+            if (e.key === 'Tab') {
+              e.preventDefault();
+              advanceEditing(e.shiftKey ? -1 : 1);
+            }
             if (e.key === 'Escape') {
               setEditing(null);
               setDraft('');
